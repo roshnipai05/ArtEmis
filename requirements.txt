@@ -1,0 +1,6 @@
+pillow 
+pandas 
+tqdm
+torchvision 
+torch
+# For DDP you usually need torch installed from official wheels suitable for your CUDA version.
