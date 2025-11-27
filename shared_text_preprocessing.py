@@ -3,9 +3,17 @@ import re
 import json
 import pandas as pd
 from collections import Counter
+from pathlib import Path
+import argparse
 
-CSV_PATH = r"C:\Users\91887\Documents\ArtEmis\artemis_dataset_release_v0.csv"
-IMG_ROOT = r"C:\Users\91887\Documents\ArtEmis\Img3k"
+parser = argparse.ArgumentParser()
+parser.add_argument("--data_dir", type=str, default="./", help="Folder containing Img3k dataset and Artemis original CSV")
+
+args = parser.parse_args()
+
+DATA_DIR = Path(args.data_dir)
+CSV_PATH = DATA_DIR / "artemis_dataset_release_v0.csv"
+IMG_ROOT = DATA_DIR / "Img3k"
 VOCAB_SIZE = 8000
 MAX_LEN = 30
 SAVE_DIR = "./text"
@@ -70,6 +78,9 @@ rev_vocab = {i:w for w,i in vocab.items()}
 # ------------------------------------------------------------
 def encode(tokens):
     seq = ["<start>"] + tokens + ["<end>"]
+    if len(seq) >MAX_LEN:
+        seq = seq[:MAX_LEN]
+        seq[-1] = "<end>"
     return [vocab.get(t, vocab["<unk>"]) for t in seq]
 
 def pad(seq):
@@ -103,7 +114,7 @@ df["split"] = df.apply(assign_split, axis=1)
 # ------------------------------------------------------------
 # 6. Save text preprocessing output
 # ------------------------------------------------------------
-df.to_csv(os.path.join(SAVE_DIR, "captions.csv"), index=False)
+df.to_pickle(os.path.join(SAVE_DIR, "captions.pkl"))
 json.dump(vocab, open(os.path.join(SAVE_DIR, "vocab.json"), "w"), indent=2)
 json.dump(rev_vocab, open(os.path.join(SAVE_DIR, "rev_vocab.json"), "w"), indent=2)
 
