@@ -115,7 +115,9 @@ df["split"] = df.apply(assign_split, axis=1)
 # 6. Save text preprocessing output
 # ------------------------------------------------------------
 df.to_pickle(os.path.join(SAVE_DIR, "df_word_encoded.pkl"))
-json.dump(vocab, open(os.path.join(SAVE_DIR, "vocab.json"), "w"), indent=2)
-json.dump(rev_vocab, open(os.path.join(SAVE_DIR, "rev_vocab.json"), "w"), indent=2)
+with open(os.path.join(SAVE_DIR, "vocab.json"), "w", encoding="utf-8") as f:
+    json.dump(vocab, f, ensure_ascii=False, indent=2)
+with open(os.path.join(SAVE_DIR, "rev_vocab.json"), "w", encoding="utf-8") as f:
+    json.dump(rev_vocab, f, ensure_ascii=False, indent=2)
 
 print("Saved text preprocessing to:", SAVE_DIR)
