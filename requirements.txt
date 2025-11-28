@@ -1,8 +1,13 @@
-gensim==4.4.0
-numpy==2.3.5
-pandas==2.3.3
-Pillow==12.0.0
-scikit_learn==1.7.2
-tokenizers==0.22.1
-torch>=2.6.0
-torchvision==0.24.1
+numpy==2.1.1
+pillow==10.4.0
+pandas==2.2.3
+tqdm==4.66.4
+scikit-learn==1.5.2
+matplotlib==3.9.2
+seaborn==0.13.2
+
+# PyTorch + torchvision (Python 3.12 compatible builds)
+torch==2.5.1
+torchvision==0.20.1
+
+
