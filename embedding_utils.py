@@ -1,5 +1,5 @@
 import numpy as np
-import json
+import json, os
 from gensim.models import KeyedVectors
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import PCA, TruncatedSVD
@@ -8,13 +8,12 @@ from pathlib import Path
 import pandas as pd
 
 #variable to compute and store all embedding matrices from scratch
-compute_matrices = False
+compute_matrices = True
 
 TOKENIZER_PATH = "./text_transformers/bpe-tokenizer.json"
 VOCAB_PATH = Path("./text_cnn/vocab.json")
-DF_DIR = "./text_cnn/df_word_encoded.pkl"
+DF_DIR = "./text_transformers/df_subword_encoded.pkl"
 
-'''
 try:
     tokenizer = Tokenizer.from_file(str(TOKENIZER_PATH))
     print(f"Tokenizer loaded from: ./bpe-tokenizer.json")
@@ -22,18 +21,13 @@ try:
 
 except Exception as e:
     print(f"Failed to load tokenizer due to: {e}")
+
 # -----------------------------------------
 # Load vocab
 # -----------------------------------------
 
 transformer_vocab = tokenizer.get_vocab()
 i2w_sw = {i:w for w,i in transformer_vocab.items()}
-'''
-
-json_string = VOCAB_PATH.read_text()
-cnn_vocab = json.loads(json_string)
-id2wrd = {i:w for w,i in cnn_vocab.items()}
-print(f"Vocab Loaded with Length: {len(cnn_vocab)}")
 
 # -----------------------------------------
 # GloVe / Word2Vec
@@ -78,8 +72,13 @@ def build_tfidf_embeddings(captions, vocab, out_path, out_dim=128):
     np.save(out_path, reduced)
     return reduced
 
+json_string = VOCAB_PATH.read_text()
+cnn_vocab = json.loads(json_string)
+id2wrd = {i:w for w,i in cnn_vocab.items()}
+print(f"Vocab Loaded with Length: {len(transformer_vocab)}")
+
 fasttxt_path = "./pretrained_embeds/fasttext.vec"
-fasttxt_out_path = "./embedding_matrices/fasttext_matrix.npy"
+fasttxt_out_path = "./embedding_matrices/fasttext_matrix_bpe.npy"
 
 w2vec_path = "./pretrained_embeds/word2vec.model"
 w2vec_out_path = "./embedding_matrices/word2vec_matrix.npy"
@@ -89,15 +88,19 @@ df = pd.read_pickle(DF_DIR)
 captions = df["utterance"]
 
 if compute_matrices:
+    '''
     load_word2vec(model_path=w2vec_path,
                 vocab=cnn_vocab,
                     out_path=w2vec_out_path)
-    
+    '''
     load_fasttxt(model_path=fasttxt_path,
-                vocab=cnn_vocab,
-                    out_path=fasttxt_out_path)
-    
+                vocab=transformer_vocab,
+                out_path=fasttxt_out_path)
+    '''
     build_tfidf_embeddings(captions=captions,
                            vocab=cnn_vocab,
                            out_path=tfidf_out_path)
+    '''
 
+with open(os.path.join("./text_transformers", "vocab.json"), "w", encoding="utf-8") as f:
+        json.dump(transformer_vocab, f, ensure_ascii=False, indent=2)

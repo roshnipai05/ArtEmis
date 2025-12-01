@@ -207,3 +207,11 @@ marimo/_lsp/
 __marimo__/
 
 pretrained_embeds/
+wikiart/
+transformers/
+transformer/
+Img15k/
+Img3k/
+Img8k/
+text_8k/
+Img15k.zip

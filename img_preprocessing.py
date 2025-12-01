@@ -23,11 +23,11 @@ from PIL import Image, UnidentifiedImageError
 from tqdm import tqdm
 
 # ---------- USER CONFIG ----------
-WIKIART_ROOT = Path.home() / "Documents" /"Downloads"/ "wikiart"/"wikiart" #adjust if yours is elsewhere
-ANNOTATION_FILE_CSV = Path.home() / "Documents" / "ArtEmis" / "artemis_dataset_release_v0.csv"
-DEST_ROOT = Path.home() / "Documents" / "ArtEmis" / "Img3k"
-TARGET_TOTAL = 3000
-IMAGE_SIZE = (256, 256)  # (width, height)
+WIKIART_ROOT = Path("./wikiart") #adjust if yours is elsewhere
+ANNOTATION_FILE_CSV = Path("./artemis_dataset_release_v0.csv")
+DEST_ROOT = Path("./Img15k")
+TARGET_TOTAL = 15000
+IMAGE_SIZE = (224, 224)  # (width, height)
 RANDOM_SEED = 42
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"}
 # ---------------------------------

@@ -11,14 +11,14 @@ args = parser.parse_args()
 
 DATA_DIR = Path(args.data_dir)
 CSV_PATH = DATA_DIR / "artemis_dataset_release_v0.csv"
-IMG_ROOT = DATA_DIR / "Img3k"
+IMG_ROOT = DATA_DIR / "Img15k"
 VOCAB_SIZE = 8000
 MAX_LEN = 30
 SAVE_DIR = Path("./text_transformers")
 
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-df = pd.read_pickle(SAVE_DIR / "df_img3k.pkl")
+df = pd.read_pickle(SAVE_DIR / "df_img15k.pkl")
 
 try:
     tokenizer = Tokenizer.from_file(str(SAVE_DIR / "bpe-tokenizer.json"))
@@ -32,35 +32,47 @@ except Exception as e:
 # 1. Encode our captions
 # ------------------------------------------------------------
 texts = df["utterance"].astype(str).tolist()
-encodings = tokenizer.encode_batch(texts)
+BATCH = 1000
+all_tokens = []
+all_ids = []
+all_attention = []
 
-df["tokens"] = [enc.tokens for enc in encodings]
-df["padding"] = [enc.ids for enc in encodings]
+for i in range(0, len(texts), BATCH):
+    batch = texts[i:i+BATCH]
+    encs = tokenizer.encode_batch(batch)
+    for enc in encs:
+        all_tokens.append(enc.tokens)
+        all_ids.append(enc.ids)
+        all_attention.append(enc.attention_mask)
 
-try:
-    df["attention_mask"] = [enc.attention_mask for enc in encodings]
-except Exception:
-    pad_id = tokenizer.token_to_id("<pad>")
-    df["attention_mask"] = [1 if enc.ids!=pad_id else 0 for enc in encodings]
-
+df["tokens"] = all_tokens
+df["padding"] = all_ids
+df["attention_mask"] = all_attention
 # ------------------------------------------------------------
 # 5. Train/val/test split by painting
 # ------------------------------------------------------------
+# 1. Compute unique (style, painting) pairs
 unique_paintings = df[["art_style", "painting"]].drop_duplicates()
+
+# 2. Sample train/val/test indices at painting level
 train = unique_paintings.sample(frac=0.7, random_state=42)
 remaining = unique_paintings.drop(train.index)
 val = remaining.sample(frac=0.5, random_state=42)
 test = remaining.drop(val.index)
 
-def assign_split(row):
-    key = (row.art_style, row.painting)
-    if key in set(map(tuple, train.values)):
-        return "train"
-    if key in set(map(tuple, val.values)):
-        return "val"
-    return "test"
+# 3. Convert pairs to a single key column (vectorized)
+df["key"] = list(zip(df["art_style"], df["painting"]))
+train_set = set(zip(train["art_style"], train["painting"]))
+val_set   = set(zip(val["art_style"], val["painting"]))
+# test set = everything else implicitly
 
-df["split"] = df.apply(assign_split, axis=1)
+# 4. Vectorized assignment (no apply!)
+df["split"] = "test"
+df.loc[df["key"].isin(train_set), "split"] = "train"
+df.loc[df["key"].isin(val_set),   "split"] = "val"
+
+# 5. Remove helper column
+df.drop(columns=["key"], inplace=True)
 
 
 # ------------------------------------------------------------

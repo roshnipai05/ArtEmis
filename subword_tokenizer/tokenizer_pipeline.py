@@ -14,7 +14,7 @@ args = parser.parse_args()
 
 DATA_DIR = Path(args.data_dir)
 CSV_PATH = DATA_DIR / "artemis_dataset_release_v0.csv"
-IMG_ROOT = DATA_DIR / "Img3k"
+IMG_ROOT = DATA_DIR / "Img15k"
 VOCAB_SIZE = 8000
 MAX_LEN = 30
 SAVE_DIR = Path("./text_transformers")
@@ -40,8 +40,8 @@ df = df[
 ].reset_index(drop=True)
 
 print("Filtered annotations:", len(df))
-df.to_pickle(SAVE_DIR / "df_img3k.pkl")
-print("IMG3k DF saved to:", SAVE_DIR)
+df.to_pickle(SAVE_DIR / "df_img15k.pkl")
+print("IMG15k DF saved to:", SAVE_DIR)
 
 
 # ------------------------------------------------------------
@@ -57,7 +57,7 @@ tokenizer.normalizer = Sequence([NFKC(), Lowercase()])
 tokenizer.pre_tokenizer = Whitespace()
 
 # Creating a trainer which will learn how to break down words into efficient subword tokens based on frequency, etc.
-trainer = trainers.BpeTrainer(vocab_size=8000, special_tokens=["<unk", "<pad>", "<start>", "<end>"])
+trainer = trainers.BpeTrainer(vocab_size=8000, special_tokens=["<pad>","<unk>", "<start>", "<end>"])
 
 # Training our tokenizer on the set of all captions
 tokenizer.train_from_iterator(df["utterance"], trainer=trainer)
