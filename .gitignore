@@ -211,6 +211,7 @@ wikiart/
 transformers/
 transformer/
 Img15k/
+Img10k/
 Img3k/
 Img8k/
 text_8k/

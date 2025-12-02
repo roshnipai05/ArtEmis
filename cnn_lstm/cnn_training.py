@@ -15,9 +15,11 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from PIL import Image
 import numpy as np
+import json
+import pickle
 
 # Optional: for evaluation
-from nltk.translate.bleu_score import corpus_bleu
+#from nltk.translate.bleu_score import corpus_bleu
 
 # ---------------------
 # 1) Encoder: Custom CNN
@@ -111,53 +113,47 @@ class LSTMDecoder(nn.Module):
 
     def forward(self, image_feats: torch.Tensor, captions: torch.Tensor, teacher_forcing_ratio: float = 1.0) -> torch.Tensor:
         """
-        Forward pass for training using teacher forcing.
-        - image_feats: (B, image_feature_dim)
-        - captions: (B, T) where captions include <start> ... <end> and are token IDs.
+        Vectorized forward pass for training.
+        IMPORTANT:
+            This version assumes teacher_forcing_ratio == 1.0 (standard teacher-forcing).
+            It generates predictions for tokens 1..T-1 in a single batched LSTM call.
+
+        Args:
+            image_feats: (B, image_feature_dim)
+            captions: (B, T) including <start> token at index 0
         Returns:
-        - logits: (B, T-1, vocab_size) predicting next-token for each input token (ignoring final <end> prediction)
+            logits: (B, T-1, vocab_size)
         """
         batch_size, seq_len = captions.size()
         device = captions.device
 
-        embeddings = self.embedding(captions)  # (B, T, embed_dim)
+        # (B, T, embed_dim)
+        embeddings = self.embedding(captions)
 
-        # Prepare initial inputs: the <start> token is at captions[:,0]
-        # We'll produce seq_len-1 predictions (predicting tokens 1..T-1)
-        outputs = torch.zeros(batch_size, seq_len - 1, self.vocab_size, device=device)
+        # We shift embeddings to get previous-word embeddings for each step 1..T-1:
+        # inputs_emb = embeddings[:, :-1, :] → predicted outputs for tokens 1..T-1
+        prev_word_embeds = embeddings[:, :-1, :]    # (B, T-1, E)
 
-        # Initialize hidden states to zeros
-        h = torch.zeros(self.lstm.num_layers, batch_size, self.lstm.hidden_size, device=device)
-        c = torch.zeros_like(h)
+        # Repeat image features across sequence length
+        # image_feats: (B, F) -> (B, 1, F) --> repeated -> (B, T-1, F)
+        image_feats_rep = image_feats.unsqueeze(1).repeat(1, seq_len - 1, 1)
 
-        # Optionally you could initialize hidden with a linear transform of image_feats
-        # e.g., h0 = linear(image_feats)  -- not used here but possible.
+        # Concatenate image features + previous-word embedding
+        # LSTM input: (B, T-1, F+E)
+        lstm_inputs = torch.cat([image_feats_rep, prev_word_embeds], dim=2)
 
-        # At each timestep:
-        #   input_vector = concat(image_feats, embedding(previous_word))
-        #   pass through LSTM cell -> get output -> predict next word
-        prev_word_embed = embeddings[:, 0, :]  # (B, embed_dim) - this is embedding of <start>
+        # Initialize hidden states (zeros)
+        h0 = torch.zeros(self.lstm.num_layers, batch_size, self.lstm.hidden_size, device=device)
+        c0 = torch.zeros_like(h0)
 
-        for t in range(1, seq_len):
-            # concat image feats to each batch's prev_word_embed
-            lstm_in = torch.cat([image_feats, prev_word_embed], dim=1).unsqueeze(1)  # (B,1,input_dim)
-            # run one timestep
-            out, (h, c) = self.lstm(lstm_in, (h, c))  # out: (B,1,hidden)
-            out = out.squeeze(1)  # (B, hidden)
-            out = self.dropout(out)
-            logits = self.fc_out(out)  # (B, vocab_size)
-            outputs[:, t - 1, :] = logits
+        # Run LSTM over the entire sequence at once
+        lstm_out, _ = self.lstm(lstm_inputs, (h0, c0))    # (B, T-1, hidden_dim)
 
-            # Decide next input: teacher forcing or use predicted token
-            use_teacher_forcing = random.random() < teacher_forcing_ratio
-            if use_teacher_forcing:
-                prev_word_embed = embeddings[:, t, :]  # ground-truth next word embedding
-            else:
-                # take argmax (greedy) from logits, then embedding
-                predicted = logits.argmax(dim=1)  # (B,)
-                prev_word_embed = self.embedding(predicted)
+        # Dropout + linear projection to vocab logits
+        lstm_out = self.dropout(lstm_out)
+        logits = self.fc_out(lstm_out)                    # (B, T-1, vocab_size)
 
-        return outputs  # (B, seq_len-1, vocab_size)
+        return logits
 
     def generate_greedy(self, image_feats: torch.Tensor, max_len: int, start_token_id: int, end_token_id: int, device: torch.device):
         """
@@ -382,10 +378,10 @@ if __name__ == "__main__":
     DROPOUT = 0.3
     BATCH_SIZE = 32
     LR = 1e-3
-    NUM_EPOCHS = 30
+    NUM_EPOCHS = 50
     TEACHER_FORCING_RATIO = 0.8
     MAX_GEN_LEN = 30
-
+    
     # ----------------------------
     # Vocabulary placeholder (you must provide this structure)
     # ----------------------------
@@ -397,20 +393,22 @@ if __name__ == "__main__":
             self.start_token = start_token
             self.end_token = end_token
             self.vocab_size = len(itos)
+    
+    with open("text_cnn/rev_vocab.json", "r") as f:
+        itos = json.load(f)
+    with open("text_cnn/vocab.json", "r") as f:
+        stoi = json.load(f)
 
-    # Example stub (replace with real vocab)
-    example_itos = ["<pad>", "<start>", "<end>", "a", "woman", "looks", "sad"]
-    example_stoi = {w:i for i,w in enumerate(example_itos)}
-    vocab = SimpleVocab(stoi=example_stoi, itos=example_itos, pad_idx=0, start_token=1, end_token=2)
+    vocab = SimpleVocab(stoi, itos, pad_idx=0, start_token=1, end_token=2)
 
     # ----------------------------
     # Example dataset stub (replace with real dataset)
     # Each item: (image_path, caption_ids_list)
     # ----------------------------
-    example_items = [
-        # ("path/to/image1.jpg", [vocab.start_token, vocab.stoi["a"], vocab.stoi["woman"], vocab.end_token]),
-        # ...
-    ]
+
+    with open("text_cnn/df_word_encoded.pkl", "rb") as f:
+        example_items = pickle.load(f)
+
     # create datasets/dataloaders
     train_dataset = ArtEmisDataset(example_items, transform=transforms.Compose([
         transforms.Resize((128,128)),
@@ -424,14 +422,23 @@ if __name__ == "__main__":
     # ----------------------------
     encoder = SimpleCNNEncoder(image_feature_dim=IMAGE_FEATURE_DIM).to(device)
     decoder = LSTMDecoder(
-        vocab_size=vocab.vocab_size,
-        embedding_dim=EMBEDDING_DIM,
-        image_feature_dim=IMAGE_FEATURE_DIM,
-        hidden_dim=HIDDEN_DIM,
-        num_layers=NUM_LAYERS,
-        dropout=DROPOUT,
-        pad_idx=vocab.pad_idx
-    ).to(device)
+    vocab_size=vocab.vocab_size,
+    embedding_dim=EMBEDDING_DIM,
+    image_feature_dim=IMAGE_FEATURE_DIM,
+    hidden_dim=HIDDEN_DIM,
+    num_layers=NUM_LAYERS,
+    dropout=DROPOUT,
+    pad_idx=vocab.pad_idx).to(device)
+
+    # Load your pretrained embeddings
+    embedding_matrix_path = r"C:\Users\91887\Documents\ArtEmis\cnn_lstm\updated_embeddings\fasttext_matrix.npy"
+    emb_matrix = np.load(embedding_matrix_path)
+    emb_tensor = torch.tensor(emb_matrix, dtype=torch.float32)
+
+    decoder.embedding.weight.data.copy_(emb_tensor)
+
+    print("Loaded pretrained embeddings:", embedding_matrix_path)
+    
 
     params = list(encoder.parameters()) + list(decoder.parameters())
     optimizer = torch.optim.Adam(params, lr=LR)

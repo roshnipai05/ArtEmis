@@ -40,7 +40,7 @@ def clean_text(text):
 
 
 # ------------------------------------------------------------
-# 2. Filter to only images in Img3k
+# 2. Filter to only images in Img15k
 # ------------------------------------------------------------
 df = pd.read_csv(CSV_PATH)
 
