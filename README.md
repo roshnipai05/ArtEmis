@@ -1,46 +1,76 @@
-# ArtEmis
+==========================================================================
+ARTEMIS IMAGE CAPTIONING - PROJECT README
 
-ArtEmis (Art Emotions) is a dataset derived from the WikiArt collection of artworks, where each image is paired with human-written captions expressing emotions, interpretations, or descriptions of the artwork. We have trained CNN+LSTM and Transformer models to predict similar descriptive captions after training on a subset of the dataset.
+OVERVIEW
 
-"ArtEmis: Affective Language for Visual Art" 
-	by P. Achlioptas, M. Ovsjanikov, K. Haydarov, M. Elhoseiny, L. Guibas
+This project implements a Custom CNN + LSTM architecture to generate captions
+for the ArtEmis dataset. It features a "from-scratch" CNN encoder and an
+"Init-Inject" LSTM decoder, optimized for training on consumer GPUs (RTX 3050).
 
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-	This is a README file for the two datasets named "ArtEmis" (Art Emotions) and "OLA" (Objective Language for Art) which contain 454,684 and 5,000 annotations each.
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+FOLDER STRUCTURE
 
-A few words for ArtEmis:
-	(1) the artemis_dataset_release_v0.csv has 454,684 rows and 5 rows: 	 
-			'art_style', 'painting', 'emotion', 'utterance', 'repetition'
+/ArtEmis
+|-- ArtEmis_Caption_Generation.ipynb   # Main Jupyter Notebook (EDA) 
+|-- cnn_training.py                    # Main Training Loop & Model Class
+|-- image_to_tensor_conversion.py      # Preprocessing Script (Images -> Tensors)
+|-- vocab_generation.py                # Preprocessing Script (Text -> JSON)
+|-- create_embeddings_final.py         # Embedding Generation (GloVe/TF-IDF)
+|-- evaluate_model.py                  # BLEU/Qualitative Eval Script
+|-- text_cnn/                          # Generated Vocabulary files
+|-- cnn_lstm/                          # Saved Checkpoints & Embeddings
+|-- README.txt                         # This file
 
-		in the standard format of the WikiArt dataset you can associate an artwork with our annotations by accessing you local directory like this: 
-		<your-top-wiki-art-dir> / 'art_style' / 'painting'  + '.jpg'.
+SETUP INSTRUCTIONS
 
-		the 'emotion' corresponds to the button clicked by the annotator out of the 9 options explained in the paper.
+Prerequisites: Python 3.8+, PyTorch, Torchvision, NLTK, NumPy, Pandas, TQDM 
+Set up a virtual environment and install all libraries/frameworks from the requirmenets.txt 
 
-		the 'utterance' is the explanation given in support of that emotion.
+Step 1: Data Preparation
 
-		the 'repetition' is an integer noting how many annotators have provided an explanation for each artwork. On average this number is 5.68. However for 701 artworks we have asked more than 41 annotators to give their opinion. This set (denoted as "rest" in the official split) is useful to measure e.g., the effect the repetition has in metrics like BLEU etc.
+Place the 'artemis_dataset_release_v0.csv' in the root folder.
 
-	(2) we have found out that the commonly used WikiArt dataset that contains 81,466 artworks has some artworks doubly listed under different art-styles. In this official release of ArtEmis we have removed such duplicate artworks, resulting in affective annotations for 80,031 *unique* artworks.
+Place your images in 'C:\Img10k'.
 
-	(3) some annotators reached out to us post-their submission time to correct/update their explanations; also we have done a fair amount of manual spell-checking. To update the utterances to reflect these changes & to create the train/test/val splits we used when training _any_ of our neural networks, please use the "preprocess_artemis_data.py" script available in https://github.com/optas/artemis.git
+Step 2: Generate Tensors (Crucial for Speed)
 
+Run: python image_to_tensor_conversion.py
 
-A few words about OLA:
-	OLA was collected to be used by the "ANP-baseline" of the paper. Its corresponding ola_dataset_release_v0.csv contains 5,000 rows with objective/descriptive utterances for artworks of WikiArt which (ideally) should not reflect any affect or sentiment. 
+This converts JPEGs to .pt files in 'C:\Img10k_pt'.
 
-	The columns 'art_style' & 'painting' can be used similarly to ArtEmis as described above.
+Step 3: Generate Vocabulary
 
-	The column 'utterance' contains each underlying description.
+Run: python vocab_generation.py
 
+This creates 'vocab.json' and 'df_word_encoded.pkl'.
 
-Panos Achlioptas, on behalf of the ArtEmis team @ March 25, 2021.
+Step 4: Generate Embeddings
 
+Run: python create_embeddings_final.py
 
-The ArtEmis Team:
-P. Achlioptas (Stanford)
-M. Ovsjanikov (Ecole Polytechnique)
-K. Haydarov (King Abdullah University of Science and Technology, KAUST)
-M. Elhoseiny (King Abdullah University of Science and Technology, KAUST)
-L. Guibas (Stanford)
+Ensure you have downloaded GloVe/FastText vectors.
+
+TRAINING
+
+To start training on the GPU:
+
+Run: python cnn_training.py
+
+Monitor the console for Loss values.
+
+Checkpoints are saved as 'best_model.pth'.
+
+EVALUATION
+
+To generate captions and calculate BLEU scores:
+
+Run: python evaluate_model.py
+
+Ensure 'MODEL_PATH' in the script points to your .pth file.
+
+SYSTEM NOTES
+
+The code uses 'Batch Size = 64' optimized for 6GB VRAM.
+
+If running on CPU, reduce Batch Size to 8 in 'cnn_training.py'.
+
+Normalization is set to [0,1] scaling (not ImageNet) to support scratch training.
