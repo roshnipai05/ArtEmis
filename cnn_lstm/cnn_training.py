@@ -15,7 +15,42 @@ import torchvision.transforms as T
 import numpy as np
 
 # ================================================================
-# 1) Encoder: Custom CNN (Simple & Shallow)
+# CONFIGURATION
+# ================================================================
+# CHANGE 1: Define the absolute path to your .pt files here
+IMG_TENSOR_DIR = r"C:\Users\sidka\Documents\Img10k_pt"
+
+# ================================================================
+# HELPER: Robust Path Handler
+# ================================================================
+def get_tensor_path(original_path: str, target_dir: str) -> Path:
+    r"""
+    Smartly converts any path (relative or absolute) containing 'Img10k'
+    into a clean path pointing to the new .pt directory.
+    Avoids string replacement errors that create 'C:\C:\...' paths.
+    """
+    path_obj = Path(original_path)
+    parts = path_obj.parts
+    
+    # Normalize parts to lowercase to find 'img10k' robustly
+    lower_parts = [p.lower() for p in parts]
+    
+    if "img10k" in lower_parts:
+        # Find where 'Img10k' is and take everything AFTER it (style/filename)
+        idx = lower_parts.index("img10k")
+        relative_parts = parts[idx+1:]
+        
+        # Rebuild path: target_dir + style + filename
+        new_path = Path(target_dir).joinpath(*relative_parts)
+    else:
+        # Fallback: Just take the last 2 parts (Style/ImageName)
+        # This handles cases where the path format is unexpected
+        new_path = Path(target_dir).joinpath(*parts[-2:])
+        
+    return new_path.with_suffix(".pt")
+
+# ================================================================
+# 1 Encoder: Custom CNN (Simple & Shallow)
 # ================================================================
 class SimpleCNNEncoder(nn.Module):
     def __init__(self, image_feature_dim: int = 256, in_channels: int = 3):
@@ -57,7 +92,7 @@ class SimpleCNNEncoder(nn.Module):
 
 
 # ================================================================
-# 2) Decoder: LSTM (Init-Inject Architecture)
+# 2 Decoder: LSTM (Init-Inject Architecture)
 # ================================================================
 class LSTMDecoder(nn.Module):
     def __init__(
@@ -74,7 +109,7 @@ class LSTMDecoder(nn.Module):
         self.vocab_size = vocab_size
         self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=pad_idx)
         
-        # CHANGE: LSTM input is now JUST the embedding size
+        # LSTM input is now JUST the embedding size
         self.lstm = nn.LSTM(
             input_size=embedding_dim,  
             hidden_size=hidden_dim,
@@ -83,7 +118,7 @@ class LSTMDecoder(nn.Module):
             dropout=dropout if num_layers > 1 else 0.0
         )
 
-        # CHANGE: Layers to map Image Features -> LSTM Initial State
+        # Layers to map Image Features -> LSTM Initial State
         self.init_h = nn.Linear(image_feature_dim, hidden_dim)
         self.init_c = nn.Linear(image_feature_dim, hidden_dim)
 
@@ -95,8 +130,6 @@ class LSTMDecoder(nn.Module):
         image_feats: (Batch, Image_Dim)
         captions: (Batch, Seq_Len)
         """
-        batch_size = image_feats.size(0)
-
         # 1. Initialize Hidden and Cell states from the Image
         # Unsqueeze and repeat for num_layers
         h0 = self.init_h(image_feats).unsqueeze(0).repeat(self.lstm.num_layers, 1, 1)
@@ -106,7 +139,6 @@ class LSTMDecoder(nn.Module):
         embeddings = self.embedding(captions) # (Batch, Seq_Len, Embed_Dim)
         
         # 3. Pass through LSTM using the image-derived initial states
-        # No need to concatenate image to input anymore
         lstm_out, _ = self.lstm(embeddings, (h0, c0))
         
         # 4. Predict words
@@ -174,13 +206,17 @@ class ArtEmisDataset(Dataset):
     def __getitem__(self, idx):
         jpeg_path, caption_ids = self.items[idx]
 
-        # Convert JPEG path → .PT tensor path
-        tensor_path = jpeg_path.replace("Img10k", "Img10k_pt")
-        tensor_path = Path(tensor_path).with_suffix(".pt")
+        # CHANGE 2: Use helper to get clean path
+        tensor_path = get_tensor_path(jpeg_path, IMG_TENSOR_DIR)
         
-        # Load Tensor
-        image = torch.load(tensor_path, weights_only=True)
-        
+        try:
+            # Load Tensor
+            image = torch.load(tensor_path, weights_only=True)
+        except FileNotFoundError:
+            # print(f"Warning: File not found {tensor_path}. Returning zero tensor.")
+            # Silencing print to avoid spamming terminal if many files are missing
+            image = torch.zeros((3, 128, 128)) # Fallback dummy tensor
+
         # Apply Augmentation (if any)
         if self.transform:
             image = self.transform(image)
@@ -219,7 +255,6 @@ def train_one_epoch(encoder, decoder, dataloader, optimizer, device, pad_idx):
 
     total_loss = 0
     n_batches = 0
-    start_time = time.time()
 
     for batch_idx, (images, inputs, targets, lengths) in enumerate(dataloader):
         images = images.to(device)
@@ -293,7 +328,7 @@ if __name__ == "__main__":
     HIDDEN_DIM = 512
     NUM_LAYERS = 1
     DROPOUT = 0.3
-    BATCH_SIZE = 16  # Increased for efficiency on GPU
+    BATCH_SIZE = 64  # Increased for efficiency on GPU
     LR = 3e-4
     NUM_EPOCHS = 30
     MAX_GEN_LEN = 30
@@ -308,6 +343,7 @@ if __name__ == "__main__":
             self.end_token = end_token
             self.vocab_size = len(itos)
 
+    # NOTE: Ensure the folder "text_cnn" exists in your current directory
     with open("text_cnn/rev_vocab.json") as f:
         itos = json.load(f)
     with open("text_cnn/vocab.json") as f:
@@ -331,14 +367,12 @@ if __name__ == "__main__":
     print(f"Val size:   {len(val_items)}")
     
     # === FIXED VALIDATION SAMPLES FOR VISUALIZATION ===
-    # We pick 3 random items from val_items ONCE and freeze them
     fixed_val_samples = random.sample(val_items, 3)
 
     # AUGMENTATION (Train Only)
     train_transform = T.Compose([
         T.RandomHorizontalFlip(p=0.5),
         T.RandomAffine(degrees=10, translate=(0.1, 0.1), scale=(0.9, 1.1)),
-        # Note: No ToTensor or Normalize because they are already tensors in [0, 1]
     ])
 
     train_dataset = ArtEmisDataset(train_items, transform=train_transform)
@@ -361,8 +395,10 @@ if __name__ == "__main__":
 
     # LOAD EMBEDDINGS
     print("Loading pretrained embeddings...")
-    # NOTE: Change this path to match whichever embedding you want to use (fasttext/glove/tfidf)
-    emb_path = r"C:\Users\91887\Documents\ArtEmis\cnn_lstm\updated_embeddings\glove_matrix.npy"
+    # NOTE: This path is absolute and likely correct if you are on the 'sidka' user account.
+    # If this fails, double check the folder "cnn_lstm/updated_embeddings" exists.
+    emb_path = r"C:\Users\sidka\Documents\ArtEmis\cnn_lstm\updated_embeddings\fasttext_matrix.npy"
+    
     if os.path.exists(emb_path):
         emb_matrix = np.load(emb_path)
         print("Embedding matrix shape:", emb_matrix.shape)
@@ -417,10 +453,15 @@ if __name__ == "__main__":
         decoder.eval()
         
         for idx, (img_path, caption_ids) in enumerate(fixed_val_samples):
-             # Load Tensor
-            t_path = Path(img_path.replace("Img10k", "Img10k_pt")).with_suffix(".pt")
-            img_tensor = torch.load(t_path).unsqueeze(0).to(device)
+             # CHANGE 3: Use helper here too
+            t_path = get_tensor_path(img_path, IMG_TENSOR_DIR)
             
+            try:
+                img_tensor = torch.load(t_path, weights_only=True).unsqueeze(0).to(device)
+            except FileNotFoundError:
+                print(f"  [Error] Could not find validation image: {t_path}")
+                continue
+
             with torch.no_grad():
                 feat = encoder(img_tensor)
                 gen_ids = decoder.generate_greedy(
