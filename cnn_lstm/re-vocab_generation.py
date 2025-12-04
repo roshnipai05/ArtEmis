@@ -7,24 +7,25 @@ from collections import Counter
 import pandas as pd
 
 # ===============================================================
-# FIXED PATHS FROM USER
+# FIXED PATHS
 # ===============================================================
 CSV_PATH = Path(r"C:\Users\91887\Documents\ArtEmis\artemis_dataset_release_v0.csv")
-IMG_ROOT = Path(r"C:\Users\91887\Documents\ArtEmis\Img10k")
+IMG_ROOT = Path(r"C:\Img10k")
 SAVE_DIR = Path(r"C:\Users\91887\Documents\ArtEmis\text_cnn")
 
-VOCAB_SIZE = 8000          # total vocab size including special tokens
-MAX_LEN = 30               # max seq length incl. <start> and <end>
-RECOMPUTE = True           # write output files automatically
+# REDUCED VOCAB SIZE AS DISCUSSED
+VOCAB_SIZE = 3500
+MAX_LEN = 30
+RECOMPUTE = True
 
-# special tokens
+# Token IDs
 PAD_IDX = 0
 UNK_IDX = 1
 START_IDX = 2
 END_IDX = 3
 
 # ===============================================================
-# 1) Text cleaning
+# 1) Clean text
 # ===============================================================
 def clean_text(text):
     if pd.isna(text):
@@ -35,57 +36,63 @@ def clean_text(text):
     return text.split()
 
 # ===============================================================
-# 2) Load CSV
+# 2) Load Artemis CSV
 # ===============================================================
-if not CSV_PATH.exists():
-    raise FileNotFoundError(f"CSV file not found: {CSV_PATH}")
-
-print("Loading metadata CSV:", CSV_PATH)
+print("\nLoading CSV...")
 df = pd.read_csv(CSV_PATH)
 
-if "art_style" not in df.columns or "painting" not in df.columns or "utterance" not in df.columns:
-    raise ValueError(f"CSV file must contain 'art_style', 'painting', and 'utterance' columns.\nColumns found: {df.columns}")
+required = {"art_style", "painting", "utterance"}
+if not required.issubset(df.columns):
+    raise ValueError(f"CSV missing required columns: {required}")
 
 # ===============================================================
-# 3) Identify valid image paths inside Img10k (subfolders = art styles)
+# 3) Scan Img10k and build FAST lookup
 # ===============================================================
-print("Scanning image root:", IMG_ROOT)
+print("\nIndexing image folders...")
+image_lookup = {} 
 
-valid_images = set()
 for art_style_dir in IMG_ROOT.iterdir():
     if not art_style_dir.is_dir():
         continue
-    art_style = art_style_dir.name.lower()
+    style_name = art_style_dir.name.lower()
     for img_file in art_style_dir.iterdir():
         if img_file.is_file():
-            valid_images.add((art_style, img_file.stem.lower()))
+            image_lookup[(style_name, img_file.stem.lower())] = str(img_file.resolve())
 
-print(f"Detected {len(valid_images)} image entries in Img10k.")
+print(f"Indexed {len(image_lookup)} images.")
 
-# Filter df rows that match existing images
-orig_len = len(df)
-df = df[df.apply(lambda r: (str(r.art_style).lower(), str(r.painting).lower()) in valid_images, axis=1)]
+# ===============================================================
+# 4) Filter DataFrame
+# ===============================================================
+print("\nFiltering annotations...")
+df["art_key"] = df["art_style"].astype(str).str.lower()
+df["paint_key"] = df["painting"].astype(str).str.lower()
+df["pair"] = list(zip(df["art_key"], df["paint_key"]))
+
+df = df[df["pair"].isin(image_lookup.keys())]
 df = df.reset_index(drop=True)
-print(f"Annotations after filtering: {len(df)} (from original {orig_len})")
+print(f"Remaining annotations: {len(df)}")
 
 # ===============================================================
-# 4) Tokenize utterances
+# 5) Tokenize
 # ===============================================================
-print("Tokenizing...")
+print("\nTokenizing text...")
 df["tokens"] = df["utterance"].apply(clean_text)
 
 all_tokens = [tok for toks in df["tokens"] for tok in toks]
 counter = Counter(all_tokens)
-print("Total tokens:", len(all_tokens))
-print("Unique words:", len(counter))
+
+print(f"Total tokens: {len(all_tokens)}")
+print(f"Unique words: {len(counter)}")
 
 # ===============================================================
-# 5) Build Vocabulary
+# 6) Build Vocabulary
 # ===============================================================
-MOST_COMMON_COUNT = VOCAB_SIZE - 4   # minus special tokens
+print("\nBuilding vocabulary...")
 
+# Reserve spots for specials
+MOST_COMMON_COUNT = VOCAB_SIZE - 4
 most_common = counter.most_common(MOST_COMMON_COUNT)
-print(f"Selecting top {MOST_COMMON_COUNT} words for vocab.")
 
 vocab = {
     "<pad>": PAD_IDX,
@@ -94,16 +101,20 @@ vocab = {
     "<end>": END_IDX
 }
 
+# Add common words
 for idx, (word, _) in enumerate(most_common, start=4):
     vocab[word] = idx
 
+# Reverse vocab (ID -> Word)
 rev_vocab = {idx: word for word, idx in vocab.items()}
 
-print("Vocabulary built. Total size:", len(vocab))
+print("Vocabulary size:", len(vocab))
 
 # ===============================================================
-# 6) Encode (NO padding here)
+# 7) Encode Captions
 # ===============================================================
+print("\nEncoding captions...")
+
 def encode(tokens):
     seq = ["<start>"] + tokens + ["<end>"]
     if len(seq) > MAX_LEN:
@@ -111,67 +122,68 @@ def encode(tokens):
         seq[-1] = "<end>"
     return [vocab.get(tok, UNK_IDX) for tok in seq]
 
-print("Encoding all captions...")
-
-entries = []  # list of (image_abs_path, token_id_list)
-missing_count = 0
-
+entries = []
 for idx, row in df.iterrows():
-    art_style = str(row.art_style).lower()
-    painting = str(row.painting).lower()
-
-    folder = IMG_ROOT / art_style
-    image_path = None
-
-    if folder.exists():
-        for f in folder.iterdir():
-            if f.is_file() and f.stem.lower() == painting:
-                image_path = f.resolve()
-                break
-
-    if image_path is None:
-        missing_count += 1
-        continue
-
+    key = row["pair"]
+    if key not in image_lookup:
+        continue 
+    image_path = image_lookup[key]
     token_ids = encode(row["tokens"])
-    entries.append((str(image_path), token_ids))
+    entries.append((image_path, token_ids))
 
-print(f"Total encoded entries: {len(entries)} (Missing images: {missing_count})")
+print(f"Final encoded pairs: {len(entries)}")
 
 # ===============================================================
-# 7) Save outputs
+# 8) SAFETY CHECK (Coverage Analysis)
+# ===============================================================
+total_tokens_count = sum(counter.values())
+kept_tokens_count = 0
+
+for word, count in counter.items():
+    if word in vocab:
+        kept_tokens_count += count
+
+unk_count = total_tokens_count - kept_tokens_count
+unk_percentage = (unk_count / total_tokens_count) * 100
+
+print(f"\n=== SAFETY CHECK ===")
+print(f"Total Tokens in dataset: {total_tokens_count}")
+print(f"Tokens converted to <unk>: {unk_count}")
+print(f"Percentage of <unk>: {unk_percentage:.2f}%")
+
+if unk_percentage > 5.0:
+    print("WARNING: <unk> is becoming too frequent (>5%). Consider increasing VOCAB_SIZE.")
+else:
+    print("SAFE: <unk> is a small fraction of the data.")
+
+# ===============================================================
+# 9) Save Outputs
 # ===============================================================
 os.makedirs(SAVE_DIR, exist_ok=True)
 
+pkl_file = SAVE_DIR / "df_word_encoded.pkl"
 vocab_file = SAVE_DIR / "vocab.json"
 rev_vocab_file = SAVE_DIR / "rev_vocab.json"
-pkl_file = SAVE_DIR / "df_word_encoded.pkl"
 
 if RECOMPUTE:
-    with open(vocab_file, "w", encoding="utf-8") as f:
-        json.dump(vocab, f, ensure_ascii=False, indent=2)
-
-    with open(rev_vocab_file, "w", encoding="utf-8") as f:
-        json.dump({int(k): v for k, v in rev_vocab.items()}, f, ensure_ascii=False, indent=2)
-
+    # 1. Save Dataset
     with open(pkl_file, "wb") as f:
         pickle.dump(entries, f)
+    print(f"\nSaved dataset: {pkl_file}")
 
-    print("Saved:")
-    print(" -", vocab_file)
-    print(" -", rev_vocab_file)
-    print(" -", pkl_file)
+    # 2. Save Vocab (Word -> ID)
+    with open(vocab_file, "w") as f:
+        json.dump(vocab, f)
+    print(f"Saved vocab: {vocab_file}")
+
+    # 3. Save Reverse Vocab (ID -> Word)
+    # Json keys must be strings, so we convert int keys to string
+    # When loading back, remember to convert keys back to int!
+    with open(rev_vocab_file, "w") as f:
+        json.dump(rev_vocab, f)
+    print(f"Saved reverse vocab: {rev_vocab_file}")
+
 else:
-    print("RECOMPUTE = False, files not saved.")
+    print("\nRECOMPUTE = False → Did not save output.")
 
-# ===============================================================
-# 8) Sanity checks
-# ===============================================================
-print("\nSample entries:")
-for i in range(min(5, len(entries))):
-    print(entries[i])
-
-max_id = max(max(ids) for _, ids in entries)
-print("\nMax token ID seen:", max_id)
-print("Expected max (VOCAB_SIZE - 1):", VOCAB_SIZE - 1)
-print("Done.")
+print("\nDone.")
