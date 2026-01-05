@@ -1,76 +1,66 @@
-==========================================================================
-ARTEMIS IMAGE CAPTIONING - PROJECT README
+# ArtEmis Image Captioning Project
 
-OVERVIEW
+## Overview
+This project implements a Custom CNN + LSTM architecture designed to generate captions for the ArtEmis dataset. The system utilizes a custom Convolutional Neural Network (CNN) encoder built from scratch and an "Init-Inject" Long Short-Term Memory (LSTM) decoder. The implementation is optimized for training on consumer-grade hardware, specifically tested on an NVIDIA RTX 3050 GPU.
 
-This project implements a Custom CNN + LSTM architecture to generate captions
-for the ArtEmis dataset. It features a "from-scratch" CNN encoder and an
-"Init-Inject" LSTM decoder, optimized for training on consumer GPUs (RTX 3050).
+## Folder Structure
+* **/ArtEmis**
+    * `ArtEmis_Caption_Generation.ipynb`: Main Jupyter Notebook containing Exploratory Data Analysis (EDA).
+    * `cnn_training.py`: Contains the main training loop and the model class definitions.
+    * `image_to_tensor_conversion.py`: Preprocessing script to convert raw image files into PyTorch tensors.
+    * `vocab_generation.py`: Preprocessing script to transform text data into JSON vocabulary files.
+    * `create_embeddings_final.py`: Script for generating word embeddings via GloVe or TF-IDF.
+    * `evaluate_model.py`: Script for calculating BLEU scores and performing qualitative evaluation.
+    * `text_cnn/`: Directory for generated vocabulary and word-encoding files.
+    * `cnn_lstm/`: Directory for saved model checkpoints and embedding weights.
 
-FOLDER STRUCTURE
+## Setup Instructions
 
-/ArtEmis
-|-- ArtEmis_Caption_Generation.ipynb   # Main Jupyter Notebook (EDA) 
-|-- cnn_training.py                    # Main Training Loop & Model Class
-|-- image_to_tensor_conversion.py      # Preprocessing Script (Images -> Tensors)
-|-- vocab_generation.py                # Preprocessing Script (Text -> JSON)
-|-- create_embeddings_final.py         # Embedding Generation (GloVe/TF-IDF)
-|-- evaluate_model.py                  # BLEU/Qualitative Eval Script
-|-- text_cnn/                          # Generated Vocabulary files
-|-- cnn_lstm/                          # Saved Checkpoints & Embeddings
-|-- README.txt                         # This file
+### Prerequisites
+* Python 3.8 or higher
+* PyTorch
+* Torchvision
+* NLTK
+* NumPy
+* Pandas
+* TQDM
 
-SETUP INSTRUCTIONS
+Ensure all dependencies are installed by running:
+`pip install -r requirements.txt`
 
-Prerequisites: Python 3.8+, PyTorch, Torchvision, NLTK, NumPy, Pandas, TQDM 
-Set up a virtual environment and install all libraries/frameworks from the requirmenets.txt 
+### Step 1: Data Preparation
+1. Place the `artemis_dataset_release_v0.csv` file in the root directory.
+2. Place the image dataset in the following local directory: `C:\Img10k`.
 
-Step 1: Data Preparation
+### Step 2: Image Preprocessing
+To optimize training speed and reduce I/O bottlenecks, convert the JPEG images into PyTorch tensors:
+`python image_to_tensor_conversion.py`
+This will generate `.pt` files in `C:\Img10k_pt`.
 
-Place the 'artemis_dataset_release_v0.csv' in the root folder.
+### Step 3: Vocabulary Generation
+Generate the required word mappings by running:
+`python vocab_generation.py`
+This produces `vocab.json` and `df_word_encoded.pkl` within the `text_cnn/` directory.
 
-Place your images in 'C:\Img10k'.
+### Step 4: Embedding Generation
+Prepare the embedding layer by running:
+`python create_embeddings_final.py`
+Note: Users must have the GloVe or FastText pre-trained vectors downloaded locally as per the script's configuration.
 
-Step 2: Generate Tensors (Crucial for Speed)
+## Training
+To execute the training process on a CUDA-enabled GPU:
+`python cnn_training.py`
 
-Run: python image_to_tensor_conversion.py
+* The script monitors training and validation loss.
+* The model state with the lowest validation loss is saved as `best_model.pth`.
 
-This converts JPEGs to .pt files in 'C:\Img10k_pt'.
+## Evaluation
+To assess model performance and generate sample captions:
+`python evaluate_model.py`
+Ensure that the `MODEL_PATH` variable within the script correctly references the saved `.pth` checkpoint.
 
-Step 3: Generate Vocabulary
-
-Run: python vocab_generation.py
-
-This creates 'vocab.json' and 'df_word_encoded.pkl'.
-
-Step 4: Generate Embeddings
-
-Run: python create_embeddings_final.py
-
-Ensure you have downloaded GloVe/FastText vectors.
-
-TRAINING
-
-To start training on the GPU:
-
-Run: python cnn_training.py
-
-Monitor the console for Loss values.
-
-Checkpoints are saved as 'best_model.pth'.
-
-EVALUATION
-
-To generate captions and calculate BLEU scores:
-
-Run: python evaluate_model.py
-
-Ensure 'MODEL_PATH' in the script points to your .pth file.
-
-SYSTEM NOTES
-
-The code uses 'Batch Size = 64' optimized for 6GB VRAM.
-
-If running on CPU, reduce Batch Size to 8 in 'cnn_training.py'.
-
-Normalization is set to [0,1] scaling (not ImageNet) to support scratch training.
+## System Specifications and Optimization
+* **VRAM Management:** The default batch size is set to 64, which is optimized for GPUs with 6GB of VRAM.
+* **CPU Execution:** If a compatible GPU is unavailable, the batch size should be reduced to 8 in `cnn_training.py` to prevent system instability.
+* **Normalization:** This project utilizes [0,1] scaling instead of standard ImageNet normalization. This supports the "from-scratch" training of the CNN, allowing it to adapt specifically to the artistic visual features present in the ArtEmis dataset.
+* **Architecture Logic:** The "Init-Inject" method is used for the LSTM decoder, where the image features are injected as the initial hidden state. This ensures the model is grounded in the visual context before beginning the sequential text generation.
