@@ -21,7 +21,7 @@ class MockDataset(Dataset):
     def __getitem__(self, idx):
         return self.images[idx], self.captions[idx]
 
-# --- COPY OF YOUR ARCHITECTURE (Keep exactly as you provided) ---
+# Architecture Skeleton
 class SimpleCNNEncoder(nn.Module):
     def __init__(self, image_feature_dim=256, in_channels=3):
         super().__init__()
