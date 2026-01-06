@@ -14,15 +14,10 @@ from torch.utils.data import DataLoader, Dataset
 import torchvision.transforms as T
 import numpy as np
 
-# ================================================================
 # CONFIGURATION
-# ================================================================
-# CHANGE 1: Define the absolute path to your .pt files here
 IMG_TENSOR_DIR = r"C:\Users\sidka\Documents\Img10k_pt"
 
-# ================================================================
 # HELPER: Robust Path Handler
-# ================================================================
 def get_tensor_path(original_path: str, target_dir: str) -> Path:
     r"""
     Smartly converts any path (relative or absolute) containing 'Img10k'
@@ -32,7 +27,7 @@ def get_tensor_path(original_path: str, target_dir: str) -> Path:
     path_obj = Path(original_path)
     parts = path_obj.parts
     
-    # Normalize parts to lowercase to find 'img10k' robustly
+    # Normalize parts to lowercase to find 'img10k' 
     lower_parts = [p.lower() for p in parts]
     
     if "img10k" in lower_parts:
@@ -49,13 +44,11 @@ def get_tensor_path(original_path: str, target_dir: str) -> Path:
         
     return new_path.with_suffix(".pt")
 
-# ================================================================
-# 1 Encoder: Custom CNN (Simple & Shallow)
-# ================================================================
+
+# Encoder: Custom CNN
 class SimpleCNNEncoder(nn.Module):
     def __init__(self, image_feature_dim: int = 256, in_channels: int = 3):
         super().__init__()
-        # 4 Blocks are enough for 128x128 input
         self.conv_blocks = nn.Sequential(
             # Block 1
             nn.Conv2d(in_channels, 64, 3, 1, 1),
@@ -91,9 +84,7 @@ class SimpleCNNEncoder(nn.Module):
         return x
 
 
-# ================================================================
-# 2 Decoder: LSTM (Init-Inject Architecture)
-# ================================================================
+# Decoder: LSTM (Init-Inject Architecture)
 class LSTMDecoder(nn.Module):
     def __init__(
         self,
@@ -179,9 +170,7 @@ class LSTMDecoder(nn.Module):
         return generated
 
 
-# ================================================================
-# 3) Masked Loss
-# ================================================================
+# Masked Loss
 def masked_cross_entropy_loss(logits, targets, pad_idx):
     B, T, V = logits.size()
     logits_flat = logits.reshape(B * T, V)
@@ -192,9 +181,7 @@ def masked_cross_entropy_loss(logits, targets, pad_idx):
     return loss_sum / non_pad if non_pad > 0 else torch.tensor(0.0, device=logits.device)
 
 
-# ================================================================
-# 4) Dataset — Loads PREPROCESSED .PT TENSORS
-# ================================================================
+# Dataset — Loads PREPROCESSED .PT TENSORS
 class ArtEmisDataset(Dataset):
     def __init__(self, items, transform=None):
         self.items = items  # list of (original_jpeg_path, token_ids)
@@ -225,9 +212,7 @@ class ArtEmisDataset(Dataset):
 
         return image, caption_ids
     
-# ================================================================
-# 5) Collate
-# ================================================================
+# Collate
 def collate_fn(batch, pad_idx):
     images, captions = zip(*batch)
     images = torch.stack(images, dim=0)
@@ -246,9 +231,7 @@ def collate_wrapper(batch):
     return collate_fn(batch, pad_idx=0)
 
 
-# ================================================================
-# 6) Training & Validation Loops
-# ================================================================
+# Training & Validation Loops
 def train_one_epoch(encoder, decoder, dataloader, optimizer, device, pad_idx):
     encoder.train()
     decoder.train()
@@ -314,10 +297,6 @@ def validate(encoder, decoder, dataloader, device, pad_idx):
             
     return total_loss / n_batches if n_batches > 0 else 0
 
-
-# ================================================================
-# 7) Main
-# ================================================================
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on: {device}")
@@ -343,7 +322,6 @@ if __name__ == "__main__":
             self.end_token = end_token
             self.vocab_size = len(itos)
 
-    # NOTE: Ensure the folder "text_cnn" exists in your current directory
     with open("text_cnn/rev_vocab.json") as f:
         itos = json.load(f)
     with open("text_cnn/vocab.json") as f:
@@ -395,8 +373,6 @@ if __name__ == "__main__":
 
     # LOAD EMBEDDINGS
     print("Loading pretrained embeddings...")
-    # NOTE: This path is absolute and likely correct if you are on the 'sidka' user account.
-    # If this fails, double check the folder "cnn_lstm/updated_embeddings" exists.
     emb_path = r"C:\Users\sidka\Documents\ArtEmis\cnn_lstm\updated_embeddings\fasttext_matrix.npy"
     
     if os.path.exists(emb_path):
