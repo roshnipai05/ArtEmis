@@ -2,21 +2,16 @@ import os
 import pickle
 import numpy as np
 
-# ---------------------------
-# CONFIG — EDIT THESE PATHS
-# ---------------------------
-VOCAB_SIZE = 8000           # or your actual vocab size
-UNK_IDX = 3                  # update if different
+VOCAB_SIZE = 8000           
+UNK_IDX = 3                 
 START_IDX = 1
 END_IDX = 2
 
 EMBEDDING_DIR = r"C:\Users\91887\Documents\ArtEmis\embedding_matrices"
 CAPTION_PKL = r"C:\Users\91887\Documents\ArtEmis\text_cnn\df_word_encoded.pkl"
 
-# ---------------------------------------
 # 1) TEST EMBEDDING MATRICES (.npy files)
-# ---------------------------------------
-print("=== TESTING WORD EMBEDDING MATRICES ===")
+print("TESTING WORD EMBEDDING MATRICES")
 
 if not os.path.isdir(EMBEDDING_DIR):
     print(f"Embedding folder does not exist: {EMBEDDING_DIR}")
@@ -24,7 +19,7 @@ else:
     files = [f for f in os.listdir(EMBEDDING_DIR) if f.endswith(".npy")]
     
     if len(files) == 0:
-        print("❌ No .npy embedding files found.")
+        print(" No .npy embedding files found.")
     else:
         for fname in files:
             path = os.path.join(EMBEDDING_DIR, fname)
@@ -36,34 +31,32 @@ else:
 
                 # Check dimensionality
                 if mat.ndim != 2:
-                    print(f"❌ Not a matrix. ndim={mat.ndim}")
+                    print(f" Not a matrix. ndim={mat.ndim}")
                 else:
                     vocab, dim = mat.shape
                     print(f"Shape: {mat.shape}")
 
                     # Check vocab size
                     if vocab != VOCAB_SIZE:
-                        print(f"⚠️ WARNING: Expected vocab size {VOCAB_SIZE}, got {vocab}")
+                        print(f"WARNING: Expected vocab size {VOCAB_SIZE}, got {vocab}")
                     else:
                         print("Vocab size matches.")
 
                     # Check numeric values
                     if not np.isfinite(mat).all():
-                        print("❌ Matrix contains NaN or Inf values.")
+                        print("Matrix contains NaN or Inf values.")
                     else:
                         print("Numeric values OK.")
 
             except Exception as e:
-                print(f"❌ Error loading {fname}: {e}")
+                print(f"Error loading {fname}: {e}")
 
 
-# ---------------------------------------
 # 2) TEST CAPTION IDS PICKLE FILE
-# ---------------------------------------
-print("\n=== TESTING CAPTION IDS PICKLE FILE ===")
+print("\n TESTING CAPTION IDS PICKLE FILE ")
 
 if not os.path.isfile(CAPTION_PKL):
-    print(f"❌ Caption pickle file not found: {CAPTION_PKL}")
+    print(f"Caption pickle file not found: {CAPTION_PKL}")
 else:
     try:
         with open(CAPTION_PKL, "rb") as f:
@@ -71,12 +64,12 @@ else:
 
         print(f"Loaded file. Total entries = {len(data)}")
 
-        # ----------- CHECK FIRST 5 EXAMPLES -----------
+        # CHECK FIRST 5 EXAMPLES 
         print("\nFirst 5 samples:")
         for i in range(min(5, len(data))):
             print(data[i])
 
-        # ----------- VALIDATION CHECKS -----------
+        # VALIDATION CHECKS
         print("\nRunning validation checks...")
 
         for idx, item in enumerate(data):
@@ -107,11 +100,11 @@ else:
 
             # Optional check: start/end tokens
             if token_ids[0] != START_IDX:
-                print(f"⚠️ WARNING: Entry {idx} does not start with <start> token.")
+                print(f" WARNING: Entry {idx} does not start with <start> token.")
             if token_ids[-1] != END_IDX:
-                print(f"⚠️ WARNING: Entry {idx} does not end with <end> token.")
+                print(f" WARNING: Entry {idx} does not end with <end> token.")
 
-        print("\n✅ Caption IDs file is correctly formatted.")
+        print("\n Caption IDs file is correctly formatted.")
 
     except Exception as e:
-        print(f"❌ ERROR: {e}")
+        print(f" ERROR: {e}")

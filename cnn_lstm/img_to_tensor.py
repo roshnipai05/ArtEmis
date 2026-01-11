@@ -7,9 +7,7 @@ import torchvision.transforms as T
 from tqdm import tqdm
 
 
-# -------------------------
 # SETTINGS
-# -------------------------
 IMG_DIR = Path(r"C:\Img10k")
 OUT_DIR = Path(r"C:\Img10k_pt")
 OUT_DIR.mkdir(exist_ok=True)
@@ -17,22 +15,12 @@ OUT_DIR.mkdir(exist_ok=True)
 BATCH_SIZE = 1
 NUM_WORKERS = 4   # Safe for Windows usually, set to 0 if you get Pickling errors
 
-
-# -------------------------
-# TRANSFORM (CORRECTED)
-# -------------------------
-# REMOVED: T.Normalize(mean=..., std=...)
-# REASON: ImageNet normalization hurts models trained from scratch.
-#         T.ToTensor() automatically scales [0, 255] -> [0.0, 1.0].
 transform = T.Compose([
     T.Resize((128, 128)),
     T.ToTensor(), 
 ])
 
-
-# -------------------------
 # DATASET
-# -------------------------
 class ImageFolderFlat(Dataset):
     def __init__(self, root):
         self.paths = []
@@ -48,7 +36,6 @@ class ImageFolderFlat(Dataset):
 
     def __getitem__(self, idx):
         p = self.paths[idx]
-        # Convert to RGB to handle grayscale/RGBA images correctly
         img = Image.open(p).convert("RGB")
         tensor = transform(img)
         return tensor, str(p)

@@ -6,9 +6,7 @@ from pathlib import Path
 from collections import Counter
 import pandas as pd
 
-# ===============================================================
 # FIXED PATHS
-# ===============================================================
 CSV_PATH = Path(r"C:\Users\91887\Documents\ArtEmis\artemis_dataset_release_v0.csv")
 IMG_ROOT = Path(r"C:\Img10k")
 SAVE_DIR = Path(r"C:\Users\91887\Documents\ArtEmis\text_cnn")
@@ -24,9 +22,7 @@ UNK_IDX = 1
 START_IDX = 2
 END_IDX = 3
 
-# ===============================================================
 # 1) Clean text
-# ===============================================================
 def clean_text(text):
     if pd.isna(text):
         return []
@@ -35,9 +31,7 @@ def clean_text(text):
     text = re.sub(r"\s+", " ", text)
     return text.split()
 
-# ===============================================================
 # 2) Load Artemis CSV
-# ===============================================================
 print("\nLoading CSV...")
 df = pd.read_csv(CSV_PATH)
 
@@ -45,9 +39,7 @@ required = {"art_style", "painting", "utterance"}
 if not required.issubset(df.columns):
     raise ValueError(f"CSV missing required columns: {required}")
 
-# ===============================================================
 # 3) Scan Img10k and build FAST lookup
-# ===============================================================
 print("\nIndexing image folders...")
 image_lookup = {} 
 
@@ -61,9 +53,7 @@ for art_style_dir in IMG_ROOT.iterdir():
 
 print(f"Indexed {len(image_lookup)} images.")
 
-# ===============================================================
 # 4) Filter DataFrame
-# ===============================================================
 print("\nFiltering annotations...")
 df["art_key"] = df["art_style"].astype(str).str.lower()
 df["paint_key"] = df["painting"].astype(str).str.lower()
@@ -73,9 +63,7 @@ df = df[df["pair"].isin(image_lookup.keys())]
 df = df.reset_index(drop=True)
 print(f"Remaining annotations: {len(df)}")
 
-# ===============================================================
 # 5) Tokenize
-# ===============================================================
 print("\nTokenizing text...")
 df["tokens"] = df["utterance"].apply(clean_text)
 
@@ -85,9 +73,7 @@ counter = Counter(all_tokens)
 print(f"Total tokens: {len(all_tokens)}")
 print(f"Unique words: {len(counter)}")
 
-# ===============================================================
 # 6) Build Vocabulary
-# ===============================================================
 print("\nBuilding vocabulary...")
 
 # Reserve spots for specials
@@ -110,9 +96,7 @@ rev_vocab = {idx: word for word, idx in vocab.items()}
 
 print("Vocabulary size:", len(vocab))
 
-# ===============================================================
 # 7) Encode Captions
-# ===============================================================
 print("\nEncoding captions...")
 
 def encode(tokens):
@@ -133,9 +117,7 @@ for idx, row in df.iterrows():
 
 print(f"Final encoded pairs: {len(entries)}")
 
-# ===============================================================
 # 8) SAFETY CHECK (Coverage Analysis)
-# ===============================================================
 total_tokens_count = sum(counter.values())
 kept_tokens_count = 0
 
@@ -146,7 +128,7 @@ for word, count in counter.items():
 unk_count = total_tokens_count - kept_tokens_count
 unk_percentage = (unk_count / total_tokens_count) * 100
 
-print(f"\n=== SAFETY CHECK ===")
+print(f"\n SAFETY CHECK ")
 print(f"Total Tokens in dataset: {total_tokens_count}")
 print(f"Tokens converted to <unk>: {unk_count}")
 print(f"Percentage of <unk>: {unk_percentage:.2f}%")
@@ -156,9 +138,7 @@ if unk_percentage > 5.0:
 else:
     print("SAFE: <unk> is a small fraction of the data.")
 
-# ===============================================================
 # 9) Save Outputs
-# ===============================================================
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 pkl_file = SAVE_DIR / "df_word_encoded.pkl"
@@ -178,7 +158,6 @@ if RECOMPUTE:
 
     # 3. Save Reverse Vocab (ID -> Word)
     # Json keys must be strings, so we convert int keys to string
-    # When loading back, remember to convert keys back to int!
     with open(rev_vocab_file, "w") as f:
         json.dump(rev_vocab, f)
     print(f"Saved reverse vocab: {rev_vocab_file}")

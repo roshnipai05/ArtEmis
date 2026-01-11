@@ -5,14 +5,15 @@ This project implements a Custom CNN + LSTM architecture designed to generate ca
 
 ## Folder Structure
 * **/ArtEmis**
-    * `ArtEmis_Caption_Generation.ipynb`: Main Jupyter Notebook containing Exploratory Data Analysis (EDA).
-    * `cnn_training.py`: Contains the main training loop and the model class definitions.
-    * `image_to_tensor_conversion.py`: Preprocessing script to convert raw image files into PyTorch tensors.
-    * `vocab_generation.py`: Preprocessing script to transform text data into JSON vocabulary files.
-    * `create_embeddings_final.py`: Script for generating word embeddings via GloVe or TF-IDF.
-    * `evaluate_model.py`: Script for calculating BLEU scores and performing qualitative evaluation.
-    * `text_cnn/`: Directory for generated vocabulary and word-encoding files.
-    * `cnn_lstm/`: Directory for saved model checkpoints and embedding weights.
+    * `EDA.ipynb`: Main Jupyter Notebook containing Exploratory Data Analysis (EDA).
+    * `img_to_tensor.py`: Preprocessing script to convert raw image files into PyTorch tensors.
+    * `re-vocab_generation.py`: Preprocessing script to transform text data into JSON vocabulary files.
+    * `re-embeddings.py`: Script for generating word embeddings via GloVe or TF-IDF.
+    * `text_cnn/`: Directory for mapping vocab to index, index to word, and word embeddings.
+    * `models/`: Directory stores the models with lowest cross-validation loss for a certain embedding.    
+    * `cnn_lstm/`: Directory for training, image to tensor conversion, embeddings and vocab generation, and sense checks.
+    * `cnn_lstm/cnn_training.py`: Contains the main training loop and the model class definitions.
+
 
 ## Setup Instructions
 
@@ -34,25 +35,25 @@ Ensure all dependencies are installed by running:
 
 ### Step 2: Image Preprocessing
 To optimize training speed and reduce I/O bottlenecks, convert the JPEG images into PyTorch tensors:
-`python image_to_tensor_conversion.py`
+`python img_to_tensor.py`
 This will generate `.pt` files in `C:\Img10k_pt`.
 
 ### Step 3: Vocabulary Generation
 Generate the required word mappings by running:
-`python vocab_generation.py`
+`python re-vocab_generation.py`
 This produces `vocab.json` and `df_word_encoded.pkl` within the `text_cnn/` directory.
 
 ### Step 4: Embedding Generation
 Prepare the embedding layer by running:
-`python create_embeddings_final.py`
-Note: Users must have the GloVe or FastText pre-trained vectors downloaded locally as per the script's configuration.
+`python re-embeddings.py`
+Note: Users must have the GloVe, FastText pre-trained vectors downloaded locally as per the script's configuration.
 
 ## Training
 To execute the training process on a CUDA-enabled GPU:
 `python cnn_training.py`
 
 * The script monitors training and validation loss.
-* The model state with the lowest validation loss is saved as `best_model.pth`.
+* The model state with the lowest validation loss is saved as `best_model.pth` in `models`
 
 ## Evaluation
 To assess model performance and generate sample captions:

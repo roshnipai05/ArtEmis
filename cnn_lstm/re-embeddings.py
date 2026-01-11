@@ -9,17 +9,13 @@ from tqdm import tqdm
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
 
-# ============================================================
 # LOGGING SETUP
-# ============================================================
 logging.basicConfig(
     format='%(asctime)s : %(levelname)s : %(message)s', 
     level=logging.INFO
 )
 
-# ============================================================
 # FIXED PATHS
-# ============================================================
 BASE_DIR = Path(r"C:\Users\91887\Documents\ArtEmis")
 CSV_PATH = BASE_DIR / "artemis_dataset_release_v0.csv"
 VOCAB_PATH = BASE_DIR / "text_cnn" / "vocab.json"
@@ -34,9 +30,7 @@ os.makedirs(EMBED_SAVE_DIR, exist_ok=True)
 
 EMBED_DIM = 300   
 
-# ============================================================
 # HELPER: Custom GloVe Converter
-# ============================================================
 def convert_glove_to_w2v_with_progress(glove_input_file, w2v_output_file):
     glove_input_file = str(glove_input_file)
     w2v_output_file = str(w2v_output_file)
@@ -65,9 +59,7 @@ def convert_glove_to_w2v_with_progress(glove_input_file, w2v_output_file):
     print(f"[INFO] Conversion complete: {w2v_output_file}")
     return True
 
-# ============================================================
 # 1. Load Vocab
-# ============================================================
 print("-" * 50)
 print("LOADING VOCAB")
 print("-" * 50)
@@ -78,9 +70,7 @@ with open(VOCAB_PATH, "r", encoding="utf-8") as f:
 VOCAB_SIZE = len(vocab)
 print(f"[INFO] Loaded vocab size = {VOCAB_SIZE}")
 
-# ============================================================
 # 2. EMBEDDING BUILDER GENERIC FUNCTION
-# ============================================================
 def build_embedding_matrix(wv, vocab, out_path, dim=300):
     if wv is None: return 0, 0
 
@@ -102,9 +92,7 @@ def build_embedding_matrix(wv, vocab, out_path, dim=300):
     print(f"[INFO] Saved matrix to {out_path}")
     return found, coverage
 
-# ============================================================
 # 3. TF-IDF EMBEDDING GENERATION (SVD / LSA)
-# ============================================================
 def build_tfidf_embeddings(csv_path, vocab, out_path, dim=300):
     print("\n" + "-"*30)
     print("GENERATING TF-IDF EMBEDDINGS")
@@ -142,15 +130,12 @@ def build_tfidf_embeddings(csv_path, vocab, out_path, dim=300):
     # Coverage for TF-IDF is always 100% of the vocab found in corpus
     return len(vocab), 100.0
 
-# ============================================================
 # EXECUTION & REPORTING
-# ============================================================
 stats = []
 
-# ----- 1. GLOVE -----
+#  1. GLOVE 
 if GLOVE_TXT.exists():
     try:
-        # Load logic (abbreviated here, uses the robust function defined above)
         w2v_path = GLOVE_TXT.with_suffix(".w2v")
         kv_path = GLOVE_TXT.with_suffix(".kv")
         
@@ -167,7 +152,7 @@ if GLOVE_TXT.exists():
     except Exception as e:
         print(f"[ERROR] GloVe failed: {e}")
 
-# ----- 2. FASTTEXT -----
+# 2. FASTTEXT 
 if FASTTEXT_VEC.exists():
     try:
         kv_path = FASTTEXT_VEC.with_suffix(".kv")
@@ -182,7 +167,7 @@ if FASTTEXT_VEC.exists():
     except Exception as e:
         print(f"[ERROR] FastText failed: {e}")
 
-# ----- 3. TF-IDF -----
+# 3. TF-IDF 
 try:
     out_path = EMBED_SAVE_DIR / "tfidf_matrix.npy"
     found, cov = build_tfidf_embeddings(CSV_PATH, vocab, out_path, EMBED_DIM)
@@ -190,9 +175,7 @@ try:
 except Exception as e:
     print(f"[ERROR] TF-IDF failed: {e}")
 
-# ============================================================
 # FINAL REPORT
-# ============================================================
 print("\n" + "="*60)
 print(f"{'EMBEDDING TYPE':<20} | {'VOCAB':<10} | {'DIM':<5} | {'COVERAGE':<10}")
 print("-" * 60)

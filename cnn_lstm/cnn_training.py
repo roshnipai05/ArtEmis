@@ -19,11 +19,7 @@ IMG_TENSOR_DIR = r"C:\Users\sidka\Documents\Img10k_pt"
 
 # HELPER: Robust Path Handler
 def get_tensor_path(original_path: str, target_dir: str) -> Path:
-    r"""
-    Smartly converts any path (relative or absolute) containing 'Img10k'
-    into a clean path pointing to the new .pt directory.
-    Avoids string replacement errors that create 'C:\C:\...' paths.
-    """
+
     path_obj = Path(original_path)
     parts = path_obj.parts
     
@@ -117,10 +113,7 @@ class LSTMDecoder(nn.Module):
         self.fc_out = nn.Linear(hidden_dim, vocab_size)
 
     def forward(self, image_feats, captions):
-        """
-        image_feats: (Batch, Image_Dim)
-        captions: (Batch, Seq_Len)
-        """
+    
         # 1. Initialize Hidden and Cell states from the Image
         # Unsqueeze and repeat for num_layers
         h0 = self.init_h(image_feats).unsqueeze(0).repeat(self.lstm.num_layers, 1, 1)
@@ -200,11 +193,8 @@ class ArtEmisDataset(Dataset):
             # Load Tensor
             image = torch.load(tensor_path, weights_only=True)
         except FileNotFoundError:
-            # print(f"Warning: File not found {tensor_path}. Returning zero tensor.")
-            # Silencing print to avoid spamming terminal if many files are missing
             image = torch.zeros((3, 128, 128)) # Fallback dummy tensor
 
-        # Apply Augmentation (if any)
         if self.transform:
             image = self.transform(image)
             
@@ -344,7 +334,6 @@ if __name__ == "__main__":
     print(f"Train size: {len(train_items)}")
     print(f"Val size:   {len(val_items)}")
     
-    # === FIXED VALIDATION SAMPLES FOR VISUALIZATION ===
     fixed_val_samples = random.sample(val_items, 3)
 
     # AUGMENTATION (Train Only)

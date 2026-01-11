@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import time
 
 # --- MOCK DATASET FOR SINGLE BATCH TESTING ---
-# We create fake tensors to avoid path issues during this specific test
+# We create fake tensors to avoid path issues
 class MockDataset(Dataset):
     def __init__(self, size=16):
         self.size = size
@@ -56,7 +56,7 @@ class LSTMDecoder(nn.Module):
         logits = self.fc_out(lstm_out)
         return logits
 
-# --- THE TEST LOOP ---
+
 def run_overfit_test():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Running Diagnostic on: {device}")
@@ -75,7 +75,7 @@ def run_overfit_test():
     optimizer = optim.Adam(list(encoder.parameters()) + list(decoder.parameters()), lr=1e-3)
     criterion = nn.CrossEntropyLoss(ignore_index=0)
 
-    print("\n--- STARTING OVERFIT TEST (Target: Loss < 0.01) ---")
+    print("\nSTARTING OVERFIT TEST (Target: Loss < 0.01)")
     encoder.train()
     decoder.train()
 
@@ -83,8 +83,8 @@ def run_overfit_test():
         for images, captions in loader:
             images, captions = images.to(device), captions.to(device)
             
-            inputs = captions # For testing, we just pass full captions (logic slightly simplified for mock)
-            targets = captions # Predict itself for sanity check logic
+            inputs = captions 
+            targets = captions 
 
             optimizer.zero_grad()
             
